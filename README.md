@@ -1,98 +1,67 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
-
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
-
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
-
-## Description
-
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
-
-## Project setup
-
+# 项目初始化
+1. 创建Nest.js项目
 ```bash
-$ pnpm install
+nest new knowledge-hub-backend
 ```
 
-## Compile and run the project
+# 技术栈选型
 
-```bash
-# development
-$ pnpm run start
+## 1. MongoDB（存文档正文）
 
-# watch mode
-$ pnpm run start:dev
+- **MongoDB 是什么？**
+  文档型数据库（NoSQL），数据以 JSON 格式的文档存储，每条文档自带结构，可嵌套数组和对象，无需提前建表，加字段零成本。
 
-# production mode
-$ pnpm run start:prod
-```
+- **MongoDB 适合存储什么样的数据？**
+  适合存储**结构灵活、变化频繁、以文档为单位读写**的数据，例如：知识文章/富文本正文、嵌套层级数据（评论树）、配置、日志。
+  不适合：强事务、强一致性、高度关联的业务（用户、权限、对账等）。
 
-## Run tests
+## 2. PostgreSQL（主数据库）
 
-```bash
-# unit tests
-$ pnpm run test
+- **为什么选择 PostgreSQL？**
+  - 知识库场景需要**全文搜索**（标题/正文检索），PostgreSQL 内置 tsvector/tsquery，MySQL 默认不支持中文分词
+  - **标签**多值字段可直接用数组类型存储，MySQL 需拆三张表做多对多
+  - **富文本正文/元数据**可用 JSONB，支持 GIN 索引与 JSON 内查询
+  - **复杂查询**（评论树、排行、权限过滤）的递归 CTE、窗口函数、物化视图更强
+  - 两者都满足 ACID 事务与并发控制；知识库读多写少，性能差异无感
 
-# e2e tests
-$ pnpm run test:e2e
+- **MySQL 和 PostgreSQL 有什么区别？**
+  日常 CRUD 两者无差别，区别体现在复杂场景：全文搜索、数组/JSONB 类型支持、复杂查询能力上 PostgreSQL 更完整。
+  选择 MySQL 的现实因素：团队更熟 MySQL、公司已有 MySQL 基础设施时，选 MySQL 运维成本更低。
 
-# test coverage
-$ pnpm run test:cov
-```
+  白话版逐条理解：
 
-## Deployment
+  - **① 全文搜索（tsvector/tsquery）—— 搜索框怎么工作**
+    - 笨办法（全量搜索）：把几万篇文章一条条读出来，用 JS 的 `includes('数据库')` 判断，需要扫描几万次
+    - 聪明做法：将文章**拆词、建好索引**，搜索时直接查索引，像查字典一样快
+    - **MySQL 痛点**：中文没有空格，MySQL 拆中文词很吃力。英文可以按空格拆（`hello world` 天然分成两个词），但中文「文档型数据库」该拆成「文档」「型」「数据库」还是别的？MySQL 默认不会拆，搜「数据库」就匹配不上「文档型数据库」。PG 可以装中文分词插件解决，MySQL 很麻烦
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+  - **② 标签数组 —— 一个数组列代替三张表**
+    - **MySQL**：文章、标签、关系表三张表做多对多，改标签/删标签都要维护关系表，易出错
+    - **PostgreSQL**：`tags TEXT[]` 一个数组列搞定，`WHERE '数据库' = ANY(tags)` 一行查出
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+  - **③ JSONB —— 一个字段存一整份 JSON**
+    - 允许把一整份 JSON 当一个字段存进去，还能在 JSON 里面查询、建索引
+    - 例：文章元数据 `{"views": 120, "likes": 8}`，可直接 `meta->>'views' > 100` 筛选
+    - 相当于「关系型数据库里嵌入了 NoSQL 的能力」
 
-```bash
-$ pnpm install -g @nestjs/mau
-$ mau deploy
-```
+  - **④ 复杂查询 —— 三个高级技能**
+    - **递归 CTE**：数据库版的「递归组件」。用一条 SQL 声明「一层层往下找，直到没有子节点」，一次性把整棵评论树拉出来：
+      ```text
+      文章
+      └─ 评论1
+         └─ 回复1.1
+            └─ 回复1.1.1
+      └─ 评论2
+      ```
+    - **窗口函数 RANK()**：遍历时还能知道自己在全局里的名次，如给每篇文章算出浏览量排名，同时保留每行原始数据
+    - **物化视图**：把查询结果提前算好存成一张表，定时刷新，相当于数据库内置的缓存
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+  - **⑤ ACID 事务与并发控制 —— 两者都好，不影响决策**
+    - **ACID**：一个事务要么全部成功、要么全部回滚，不会出现「钱扣了但会员没开」的中间状态
+    - **并发控制（MVCC）**：读的人和写的人互不阻塞
+    - 知识库读多写少，两者普通读性能差异 <5%，所以这条不影响选择
 
-## Resources
 
-Check out a few resources that may come in handy when working with NestJS:
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
 
-## Support
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
-
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
-
-## License
-
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
