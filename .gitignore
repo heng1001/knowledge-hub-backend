@@ -62,3 +62,12 @@ report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 volumes/mongo/.mongodb/
 volumes/mongo/diagnostic.data/
 volumes/mongo/journal/
+volumes/mongo/mongod.lock
+
+# PostgreSQL 运行时文件（非业务数据，随数据库运行而变化）
+volumes/postgres/pg_stat/
+volumes/postgres/pg_wal/
+volumes/postgres/**/pg_internal.init
+
+# pgAdmin 运行时会话
+volumes/pgadmin/sessions/
