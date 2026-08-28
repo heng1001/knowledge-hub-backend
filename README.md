@@ -4,6 +4,15 @@
 nest new knowledge-hub-backend
 ```
 
+2. 新建docker-compose.yml文件
+- 从gitCode复制的：先只复制MongoDB和PostgreSQL相关的
+- 首次启动：
+```bash
+docker compose up -d
+```
+
+
+
 # 技术栈选型
 
 ## 1. MongoDB（存文档正文）
