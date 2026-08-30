@@ -58,16 +58,8 @@ report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 # Claude Code local settings
 .claude/
 
-# MongoDB 客户端历史 / 诊断数据 / 崩溃恢复日志（非业务数据，启动时自动重建）
-volumes/mongo/.mongodb/
-volumes/mongo/diagnostic.data/
-volumes/mongo/journal/
-volumes/mongo/mongod.lock
-
-# PostgreSQL 运行时文件（非业务数据，随数据库运行而变化）
-volumes/postgres/pg_stat/
-volumes/postgres/pg_wal/
-volumes/postgres/**/pg_internal.init
-
-# pgAdmin 运行时会话
-volumes/pgadmin/sessions/
+# 数据库数据卷（docker-compose bind-mount 运行时数据，启动时自动重建）
+# 由 docker-compose 在启动时自动创建，不纳入版本控制
+volumes/mongo/*
+volumes/postgres/*
+volumes/pgadmin/*
